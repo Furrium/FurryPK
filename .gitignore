@@ -1,0 +1,38 @@
+# ===== 敏感文件（绝不提交）=====
+.env
+.env.local
+.env.*.local
+
+# ===== 运行时数据（玩家档案 / 排行榜 / 聊天 / 反作弊记录）=====
+data/
+*.db
+*.sqlite
+
+# ===== 依赖 =====
+node_modules/
+.npm/
+
+# ===== 备份文件 =====
+*.bak
+*.bak2
+*.bak3
+*.orig
+*.rej
+
+# ===== 重复资产（与其他/ 内容相同，见 README）=====
+其他/
+
+# ===== 构建产物 =====
+dist/
+build/
+*.log
+
+# ===== 系统 =====
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== 编辑器 =====
+.vscode/
+.idea/
+*.swp
