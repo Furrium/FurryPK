@@ -1,4 +1,4 @@
-# NEON ARENA · FPS Online
+# NEON ARENA · FurryPK SUPER Edition
 
 浏览器多人 FPS。three.js r128 + WebSocket 权威服务端,无构建步骤、无 npm 依赖,`docker compose up` 即可跑。
 
