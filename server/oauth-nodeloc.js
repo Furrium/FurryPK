@@ -7,6 +7,9 @@ const BASE_URL = (process.env.NodeLoc_URL || process.env.NODELOC_URL || 'https:/
 
 const REDIRECT_URI = process.env.NodeLoc_REDIRECT_URI || process.env.NODELOC_REDIRECT_URI
   || 'http://fps2.zard.loc.cc/oauth/nodeloc';
+// 凭据从环境变量读取（原来是裸标识符，依赖 _globals-shim.js 注入）
+const CLIENT_ID = process.env.NODELOC_CLIENT_ID || process.env.CLIENT_ID || '';
+const CLIENT_SECRET = process.env.NODELOC_CLIENT_SECRET || process.env.CLIENT_SECRET || '';
 const SCOPE = process.env.NodeLoc_SCOPE || process.env.NODELOC_SCOPE || 'openid profile';
 const NATIVE_SCHEME = process.env.NATIVE_OAUTH_SCHEME || 'neonarena';
 const COOKIE_SESSION = 'na_nl';

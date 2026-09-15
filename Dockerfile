@@ -22,4 +22,4 @@ EXPOSE 3066
 HEALTHCHECK --interval=30s --timeout=4s --start-period=5s --retries=3 \
   CMD wget -qO- http://127.0.0.1:3066/health || exit 1
 
-CMD ["node", "--require", "./server/_globals-shim.js", "server/index.js"]
+CMD ["node", "server/index.js"]

@@ -57,7 +57,6 @@ docker compose up -d --build
 │   ├── physics.js           # 移动与碰撞解算
 │   ├── rooms.js             # 房间与状态机
 │   ├── oauth-nodeloc.js     # NodeLoc OAuth 登录(可选)
-│   └── _globals-shim.js     # 给旧模块补全局变量
 │
 ├── Dockerfile
 ├── docker-compose.yml
