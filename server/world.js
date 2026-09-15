@@ -1663,6 +1663,9 @@ class World {
     const cfg = b && b.type === 'amiya' ? b.cfg : null;
     for (let i = this.unseenHands.length - 1; i >= 0; i--) {
       const h = this.unseenHands[i];
+      // 防御：数组理论上不该有空洞，但曾经在长时间运行的实例里观察到过一次
+      // （原因未定位，疑与热重载/异常中断有关）。跳过并自愈，避免每帧抛异常刷屏。
+      if (!h) { this.unseenHands.splice(i, 1); continue; }
       if (h.hp <= 0 || t >= h.dieAt || !b || b.type !== 'amiya') {
         this.unseenHands.splice(i, 1);
         continue;
