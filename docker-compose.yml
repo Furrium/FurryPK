@@ -2,19 +2,25 @@ services:
   neon-arena:
     image: ${IMAGE:-neon-arena-fps:latest}
     build: .
-    container_name: neon-arena
+    # 容器名可用 .env 覆盖，便于同机跑多实例
+    container_name: ${CONTAINER_NAME:-neon-arena}
     ports:
-      - "3066:3066"
+      # 左边是宿主机端口（读 .env 的 PORT），右边固定是容器内端口
+      - "${PORT:-3066}:3066"
     environment:
+      # 容器内始终监听 3066（与 Dockerfile EXPOSE 一致）
       - PORT=3066
       - DATA_DIR=/app/data
-      # --- NodeLoc OAuth ---
-      - NodeLoc_REDIRECT_URI=${NodeLoc_REDIRECT_URI}
+      # --- NodeLoc OAuth（可选，留空则登录功能自动关闭）---
+      - NodeLoc_REDIRECT_URI=${NodeLoc_REDIRECT_URI:-}
       - NodeLoc_SCOPE=${NodeLoc_SCOPE:-openid profile}
-      - NODELOC_CLIENT_ID=${NODELOC_CLIENT_ID}
-      - NODELOC_CLIENT_SECRET=${NODELOC_CLIENT_SECRET}
+      - NODELOC_CLIENT_ID=${NODELOC_CLIENT_ID:-}
+      - NODELOC_CLIENT_SECRET=${NODELOC_CLIENT_SECRET:-}
       - NODELOC_SESSION_SECRET=${NODELOC_SESSION_SECRET:-}
       - COOKIE_SECURE=${COOKIE_SECURE:-}
     volumes:
-      - /opt/neon-arena/data:/app/data
+      # 运行时数据（玩家档案/聊天/反作弊）存到仓库同级的 data/。
+      # 相对路径：克隆到哪就存到哪，无需预先创建 /opt 目录。
+      # data/ 已在 .gitignore 中，不会误提交。
+      - ./data:/app/data
     restart: unless-stopped
