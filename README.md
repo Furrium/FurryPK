@@ -205,3 +205,5 @@ server {
 ## 许可
 
 代码仅供学习交流。使用的第三方库(three.js 等)遵循其各自许可证。
+
+本项目二次开发于[Zard's 零区冲突](https://github.com/ZardQAQ/fps-online-game)。
