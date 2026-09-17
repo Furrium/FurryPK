@@ -43,6 +43,7 @@
       </div>
       <button id="btnPlay" class="btn primary">🎮 进入战斗</button>
       <button id="btnSpec" class="btn">👁️ 观战模式</button>
+      <button id="btnStats" class="btn ghost">📊 战绩成就</button>
       <button id="btnAbout" class="btn ghost">💭 关于作者</button>
       <div class="help" id="helpDesktop">
         <div class="help-title">操作说明</div>
@@ -204,6 +205,48 @@
       <button type="button" id="btnArsenal" class="btn primary">🔫 枪械模型展</button>
     </div>
     <div class="panel-hint">按 Esc 或点 × 关闭</div>
+  </div>
+</div>
+
+
+<!-- ======== 战绩 & 成就 ======== -->
+<div id="statsPanel" class="overlay panel hidden">
+  <div class="panel-card stats-card">
+    <button class="panel-close" id="statsClose" aria-label="关闭">×</button>
+    <div class="panel-title">📊 战绩与成就 <span class="panel-sub" id="statsWho"></span></div>
+
+    <div class="tabs">
+      <button id="tabStats" class="tab active">战绩</button>
+      <button id="tabAch" class="tab">成就</button>
+    </div>
+
+    <!-- 战绩页 -->
+    <div id="statsView">
+      <div class="stat-grid" id="statGrid"></div>
+      <div class="stat-sub">武器击杀</div>
+      <div class="wp-rows" id="statWeapons"></div>
+    </div>
+
+    <!-- 成就页 -->
+    <div id="achView" class="hidden">
+      <div class="ach-bar">
+        <span id="achCount">0 / 0</span>
+        <div class="ach-progress"><div id="achProgressFill"></div></div>
+      </div>
+      <div class="ach-list" id="achList"></div>
+    </div>
+
+    <div class="panel-hint">按 Esc 或点 × 关闭</div>
+  </div>
+</div>
+
+<!-- ======== 成就解锁弹窗 ======== -->
+<div id="achToast" class="ach-toast hidden">
+  <div class="ach-toast-icon" id="achToastIcon">🏆</div>
+  <div class="ach-toast-body">
+    <div class="ach-toast-title">成就解锁</div>
+    <div class="ach-toast-name" id="achToastName"></div>
+    <div class="ach-toast-reward" id="achToastReward"></div>
   </div>
 </div>
 

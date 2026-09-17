@@ -320,6 +320,54 @@ const LOGIN_REWARDS = [
 ];
 const LOGIN_DUP_COINS = 80; // 循环再领已拥有时装时的补偿金币
 
+
+// ---------- 成就系统 ----------
+// 判定全部基于玩家档案里的累计统计（prof.st）或已有字段，服务端在每次战绩变动后检查。
+// stat:  取数字的路径，支持 'kills'、'st.dmgDealt'、'st.wpKills.sniper' 这类点号路径
+// goal:  达标阈值
+// reward: 解锁奖励金币
+// hidden: 是否在未解锁时隐藏描述（彩蛋类）
+const ACHIEVEMENTS = [
+  // ---- 击杀里程碑 ----
+  { id: 'kill_10',    name: '初露锋芒',   desc: '累计击杀 10 人',        stat: 'kills', goal: 10,   reward: 120,  icon: '🗡️' },
+  { id: 'kill_100',   name: '百人斩',     desc: '累计击杀 100 人',       stat: 'kills', goal: 100,  reward: 400,  icon: '⚔️' },
+  { id: 'kill_500',   name: '千锤百炼',   desc: '累计击杀 500 人',       stat: 'kills', goal: 500,  reward: 1200, icon: '🔥' },
+  { id: 'kill_1500',  name: '竞技场之主', desc: '累计击杀 1500 人',      stat: 'kills', goal: 1500, reward: 3000, icon: '👑' },
+
+  // ---- 连杀 ----
+  { id: 'streak_5',   name: '五连杀',     desc: '单条命达成 5 连杀',     stat: 'st.streakMax', goal: 5,  reward: 200,  icon: '✨' },
+  { id: 'streak_10',  name: '十连杀',     desc: '单条命达成 10 连杀',    stat: 'st.streakMax', goal: 10, reward: 600,  icon: '💫' },
+  { id: 'streak_20',  name: '无人能挡',   desc: '单条命达成 20 连杀',    stat: 'st.streakMax', goal: 20, reward: 1800, icon: '🌟' },
+
+  // ---- BOSS ----
+  { id: 'boss_1',     name: '屠龙者',     desc: '首次击杀 BOSS',         stat: 'bossKills', goal: 1,  reward: 200,  icon: '🐉' },
+  { id: 'boss_25',    name: 'BOSS 终结者', desc: '累计击杀 25 次 BOSS',  stat: 'bossKills', goal: 25, reward: 1000, icon: '☠️' },
+  { id: 'boss_100',   name: '灾厄化身',   desc: '累计击杀 100 次 BOSS',  stat: 'bossKills', goal: 100, reward: 4000, icon: '💀' },
+
+  // ---- 枪法 ----
+  { id: 'hs_50',      name: '神枪手',     desc: '累计爆头 50 次',        stat: 'st.headshots', goal: 50,   reward: 300,  icon: '🎯' },
+  { id: 'hs_300',     name: '爆头机器',   desc: '累计爆头 300 次',       stat: 'st.headshots', goal: 300,  reward: 900,  icon: '💥' },
+  { id: 'dmg_10k',    name: '重炮手',     desc: '累计造成 10000 伤害',   stat: 'st.dmgDealt',  goal: 10000, reward: 300, icon: '💣' },
+  { id: 'dmg_100k',   name: '毁灭者',     desc: '累计造成 100000 伤害',  stat: 'st.dmgDealt',  goal: 100000, reward: 1500, icon: '☄️' },
+
+  // ---- 武器专精 ----
+  { id: 'sniper_30',  name: '一枪一个',   desc: '用狙击枪击杀 30 人',    stat: 'st.wpKills.sniper',  goal: 30, reward: 500, icon: '🔭' },
+  { id: 'railgun_20', name: '电磁风暴',   desc: '用电磁炮击杀 20 人',    stat: 'st.wpKills.railgun', goal: 20, reward: 700, icon: '⚡' },
+  { id: 'hammer_20',  name: '碎颅者',     desc: '用铁锤击杀 20 人',      stat: 'st.wpKills.hammer',  goal: 20, reward: 500, icon: '🔨' },
+  { id: 'melee_50',   name: '冷兵器大师', desc: '近战击杀累计 50 人',    stat: 'st.meleeKills', goal: 50, reward: 800, icon: '🗡️' },
+  { id: 'nade_30',    name: '爆破专家',   desc: '用手雷击杀 30 人',      stat: 'st.nadeKills',  goal: 30, reward: 600, icon: '🧨' },
+
+  // ---- 生存 ----
+  { id: 'play_1h',    name: '老玩家',     desc: '累计游戏 1 小时',       stat: 'st.playMs', goal: 3600000,  reward: 200,  icon: '⏱️' },
+  { id: 'play_10h',   name: '常驻居民',   desc: '累计游戏 10 小时',      stat: 'st.playMs', goal: 36000000, reward: 1000, icon: '🕐' },
+  { id: 'join_50',    name: '熟面孔',     desc: '累计进入竞技场 50 次',  stat: 'joins', goal: 50, reward: 300, icon: '🚪' },
+
+  // ---- 特殊 ----
+  { id: 'wither_10',  name: '终结者',     desc: '终结 10 次他人连杀',    stat: 'st.witherKills', goal: 10, reward: 600, icon: '✂️' },
+  { id: 'far_80',     name: '超视距',     desc: '完成一次 80 米外击杀',  stat: 'st.longestKill', goal: 80, reward: 700, icon: '📡' },
+  { id: 'decoy_15',   name: '开发者克星', desc: '击杀 zard 15 次',       stat: 'decoyKills', goal: 15, reward: 0, icon: '🏆' },
+];
+
 // ---------- 全局玩法参数 ----------
 // ===== 浓雾事件 =====
 // 不规则触发：每次结束后在 [minGap, maxGap] 秒内随机等待
@@ -383,4 +431,4 @@ const EGG_AUTH = {
 };
 
 module.exports = {
-  FOG_EVENT, MAP, WEAPONS, EQUIPS, BUFFS, PICKUP_POOLS, BOSS, BOSSES, SHOP, SHOP_SLOTS, LOGIN_REWARDS, LOGIN_DUP_COINS, RULES, DECOY, EGG_AUTH };
+  FOG_EVENT, MAP, WEAPONS, EQUIPS, BUFFS, PICKUP_POOLS, BOSS, BOSSES, SHOP, SHOP_SLOTS, LOGIN_REWARDS, LOGIN_DUP_COINS, RULES, DECOY, EGG_AUTH, ACHIEVEMENTS };

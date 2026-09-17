@@ -2,6 +2,7 @@
 'use strict';
 const { MAP, WEAPONS, EQUIPS, BUFFS, PICKUP_POOLS, BOSS, BOSSES, SHOP, RULES, DECOY, EGG_AUTH } = require('./config');
 const board = require('./leaderboard');
+const stats = require('./stats');
 const login = require('./login');
 const { containsProfanity } = require('./chatfilter');
 const chatlog = require('./chatlog');
@@ -269,6 +270,7 @@ class World {
       coins, owned, eq,
       shopKeepGun: null,   // 商店购入枪械：死亡后可保留复活一次
       lastChatAt: 0, lastSpawnIdx: -1, _cheat: false, ip: normIp, nodelocId, isDecoy,
+      joinAt: now(),   // 本次会话开始时间（离场时结算时长）
       rttMs: 80, posHist: [],
     };
     this.placeAtSpawn(p);
@@ -331,6 +333,13 @@ class World {
     this.clearCharge(p);
     p._cheat = false;
     this.clearUnseenHandsForTarget(id); // 目标离场：锁定他的不可视之手立刻收回
+    // ---- 战绩统计：本次会话时长 ----
+    if (!p.isDecoy && p.joinAt) {
+      const prof = board.getForPlayer(p);
+      stats.onSessionEnd(prof, now() - p.joinAt);
+      const newly = stats.checkAchievements(prof);
+      if (newly.length) stats.announce(this, p.id, newly);
+    }
     this.saveProfile(p);
     this.ac.detach(id);
     this.players.delete(id);
@@ -854,6 +863,12 @@ class World {
     }
     }
     if (!cheat) p.mon.aimShot({ dir: dv, view: this.viewVec(p), hit: anyHit, headshot: anyHeadshot });
+    // ---- 战绩统计：命中率 ----
+    if (!p.isDecoy) {
+      const pProf = board.getForPlayer(p);
+      stats.onShotFired(pProf);
+      if (anyHit) stats.onShotHit(pProf);
+    }
     const fx = { type: 'fx', k: 'shot', id: p.id, wp: p.gun, o: [r2(eye.x), r2(eye.y), r2(eye.z)], e: ends[0], tg: fxTg };
     if (pellets > 1) fx.es = ends;
     this.broadcast(fx);
@@ -1403,6 +1418,13 @@ class World {
     dmg = Math.round(dmg);
     victim.hp -= dmg;
     if (attacker && attacker !== victim && opts.melee) this.zombieLifesteal(attacker, dmg);
+    // ---- 战绩统计：伤害 ----
+    if (attacker && attacker !== victim) {
+      if (!attacker.isDecoy) {
+        stats.onDamageDealt(board.getForPlayer(attacker), dmg, { crit, hs: !!opts.hs });
+      }
+      if (!victim.isDecoy) stats.onDamageTaken(board.getForPlayer(victim), dmg);
+    }
     this.broadcast({
       type: 'fx', k: 'hit', tg: victim.id, by: attacker ? attacker.id : 0,
       dmg, crit, hs: !!opts.hs, pos: this.chest(victim),
@@ -1454,6 +1476,22 @@ class World {
       attacker.streak++;
       const aProf = board.getForPlayer(attacker); aProf.kills++;
       if (attacker.streak > aProf.bestStreak) aProf.bestStreak = attacker.streak;
+      // ---- 战绩统计：击杀 ----
+      {
+        const dist = Math.hypot(attacker.pos.x - victim.pos.x, attacker.pos.z - victim.pos.z);
+        const wpDef = WEAPONS[wKey];
+        stats.onKill(aProf, wKey, dist, {
+          melee: !!(wpDef && wpDef.slot === 'melee'),
+          shutdown,
+        });
+        stats.onStreak(aProf, attacker.streak);
+        const newly = stats.checkAchievements(aProf);
+        if (newly.length) {
+          this.saveProfile(attacker);
+          stats.announce(this, attacker.id, newly);
+          this.sendYou(attacker);
+        }
+      }
       board.save();
       kInfo = { id: attacker.id, n: attacker.name, c: attacker.color };
       const s = attacker.streak;
@@ -1467,6 +1505,7 @@ class World {
     } else if (attacker === victim) {
       this.broadcast({ type: 'sys', style: 'kill', text: `💥 ${victim.name} 自爆了` });
     } else if (bossName) {
+      if (!victim.isDecoy) stats.onDeathByBoss(board.getForPlayer(victim));
       this.broadcast({ type: 'sys', style: 'kill', text: `👹 ${bossName} 击杀了 ${victim.name}` });
     } else if (!victim.isDecoy) {
       this.broadcast({ type: 'sys', style: 'kill', text: `💥 ${victim.name} 被炸飞了` });

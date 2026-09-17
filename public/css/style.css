@@ -649,3 +649,275 @@ body.touch-edit #joyHint::after { bottom: -20px; }
   35% { transform: rotate(-90deg); }
   65% { transform: rotate(-90deg); }
 }
+
+/* ============================================================
+   UI 动效 & 战绩成就面板
+   ------------------------------------------------------------
+   面板过渡说明：
+   原生 .hidden 用 display:none，无法做过渡。这里为面板新增
+   .panel-anim 机制 —— 用 visibility + opacity + transform 组合，
+   保证既能过渡、又不会拦截点击（visibility:hidden 不接收事件）。
+   ============================================================ */
+
+/* ---------- 面板滑入 / 淡出 ---------- */
+.overlay.panel {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity .22s ease, visibility 0s linear 0s;
+}
+.overlay.panel.panel-anim {
+  opacity: 0;
+  visibility: hidden;
+  /* 关闭时延迟 visibility，让淡出动画播完 */
+  transition: opacity .16s ease, visibility 0s linear .16s;
+  pointer-events: none;
+}
+/* 面板卡片本身的位移 + 缩放 */
+.overlay.panel .panel-card {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+  transition: transform .26s cubic-bezier(.22, 1.2, .36, 1), opacity .2s ease;
+}
+.overlay.panel.panel-anim .panel-card {
+  transform: translateY(18px) scale(.965);
+  opacity: 0;
+  transition: transform .18s ease, opacity .14s ease;
+}
+/* 背景遮罩同步淡入 */
+.overlay.panel.panel-anim { backdrop-filter: blur(0); }
+.overlay.panel { backdrop-filter: blur(2px); }
+
+/* 关闭按钮也做个小位移，增加层次 */
+.overlay.panel.panel-anim .panel-close { transform: scale(.8) rotate(-45deg); }
+.overlay.panel .panel-close { transition: transform .24s cubic-bezier(.22,1.2,.36,1), background .15s, border-color .15s; }
+
+/* ---------- 面板内元素依次弹入（stagger） ---------- */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+/* 依次弹入：delay 必须写进 animation 简写里。
+   原因：animation 简写会把 animation-delay 重置为 0，
+   而 :not(.panel-anim) 让这条规则特异性高于单独写 animation-delay 的规则，
+   所以两者必须合并。 */
+.overlay.panel:not(.panel-anim) .stagger {
+  animation: fadeUp .34s cubic-bezier(.22, 1, .36, 1) calc(var(--i, 0) * 45ms) both;
+}
+
+/* ---------- 按钮交互反馈 ---------- */
+.btn { position: relative; overflow: hidden; }
+.btn:active { transform: translateY(1px) scale(.985); }
+.btn::after {
+  /* 点击涟漪的承载层 */
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(circle at var(--rx, 50%) var(--ry, 50%),
+              rgba(255,255,255,.45), transparent 55%);
+  opacity: 0;
+  transition: opacity .45s ease;
+  pointer-events: none;
+}
+.btn.tapped::after { opacity: 1; transition: opacity .06s ease; }
+
+/* 主按钮加一点光晕呼吸，吸引视线但不抢戏 */
+@keyframes btnGlow {
+  0%, 100% { box-shadow: 0 0 12px rgba(53,224,255,.18); }
+  50%      { box-shadow: 0 0 22px rgba(53,224,255,.34); }
+}
+.btn.primary { animation: btnGlow 3.2s ease-in-out infinite; }
+.btn.primary:hover { animation: none; box-shadow: 0 0 26px rgba(53,224,255,.45); }
+
+/* 面板关闭按钮的 hover 已有定义，这里补一个按下反馈 */
+.panel-close:active { transform: scale(.9) !important; }
+
+/* ---------- 金币数字滚动 ---------- */
+.coin-bump { animation: coinBump .5s cubic-bezier(.22, 1.4, .36, 1); }
+@keyframes coinBump {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.22); color: #fff3c4; }
+  100% { transform: scale(1); }
+}
+
+/* ---------- 商店 / 成就卡片依次弹入 ---------- */
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(14px) scale(.94); }
+  to   { opacity: 1; transform: none; }
+}
+.card-in { animation: cardIn .38s cubic-bezier(.22, 1.1, .36, 1) both; }
+
+/* ---------- 成就解锁弹窗 ---------- */
+.ach-toast {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 250px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, rgba(20,26,44,.96), rgba(10,14,24,.96));
+  border: 1px solid var(--gold);
+  border-radius: 12px;
+  box-shadow: 0 0 28px rgba(255,210,60,.32), 0 8px 24px rgba(0,0,0,.5);
+  pointer-events: none;
+}
+.ach-toast.show { animation: achIn 4.2s cubic-bezier(.22, 1.1, .36, 1) forwards; }
+@keyframes achIn {
+  0%   { opacity: 0; transform: translateX(60px) scale(.9); }
+  8%   { opacity: 1; transform: translateX(0) scale(1.03); }
+  12%  { transform: translateX(0) scale(1); }
+  85%  { opacity: 1; transform: translateX(0); }
+  100% { opacity: 0; transform: translateX(0) translateY(-8px); }
+}
+.ach-toast-icon {
+  font-size: 30px;
+  line-height: 1;
+  filter: drop-shadow(0 0 8px rgba(255,210,60,.7));
+}
+.ach-toast-body { display: flex; flex-direction: column; gap: 2px; }
+.ach-toast-title { font-size: 10px; letter-spacing: 2px; color: var(--gold); font-weight: 700; }
+.ach-toast-name { font-size: 15px; font-weight: 800; color: #fff; }
+.ach-toast-reward { font-size: 11px; color: #ffe9a0; }
+
+/* ---------- 战绩面板 ---------- */
+.stats-card { width: 560px; }
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.stat-cell {
+  padding: 10px 8px;
+  text-align: center;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 9px;
+}
+.stat-cell .sv { font-size: 19px; font-weight: 800; color: var(--neon); line-height: 1.2; }
+.stat-cell .sl { font-size: 10px; color: #8fb2cc; margin-top: 3px; letter-spacing: .5px; }
+.stat-cell.gold .sv { color: var(--gold); }
+.stat-cell.pink .sv { color: var(--neon2); }
+
+.stat-sub {
+  font-size: 12px; font-weight: 700; color: var(--gold);
+  letter-spacing: 1px; margin: 4px 0 8px;
+}
+.wp-rows { display: flex; flex-direction: column; gap: 5px; }
+.wp-row {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; padding: 5px 8px;
+  background: rgba(255,255,255,.03);
+  border-radius: 6px;
+}
+.wp-row .wn { flex: 1; color: #cfe6f5; }
+.wp-row .wbar {
+  flex: 0 0 110px; height: 5px; border-radius: 3px;
+  background: rgba(255,255,255,.1); overflow: hidden;
+}
+.wp-row .wbar i {
+  display: block; height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, var(--neon), var(--neon2));
+  width: 0;
+  transition: width .5s cubic-bezier(.22,1,.36,1);
+}
+.wp-row .wc { flex: 0 0 34px; text-align: right; font-weight: 700; color: var(--gold); }
+
+/* ---------- 成就列表 ---------- */
+.ach-bar {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 12px; font-size: 12px; color: var(--gold); font-weight: 700;
+}
+.ach-progress {
+  flex: 1; height: 7px; border-radius: 4px;
+  background: rgba(255,255,255,.1); overflow: hidden;
+}
+#achProgressFill {
+  height: 100%; width: 0; border-radius: 4px;
+  background: linear-gradient(90deg, var(--gold), var(--neon2));
+  transition: width .6s cubic-bezier(.22,1,.36,1);
+}
+.ach-list {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
+  max-height: 46vh; overflow-y: auto; padding-right: 4px;
+  scrollbar-width: thin;
+}
+.ach-item {
+  display: flex; gap: 9px; padding: 9px 10px;
+  background: rgba(255,255,255,.035);
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 9px;
+  opacity: .55;
+  transition: opacity .2s, border-color .2s, background .2s;
+}
+.ach-item.done {
+  opacity: 1;
+  border-color: rgba(255,210,60,.5);
+  background: linear-gradient(135deg, rgba(255,210,60,.12), rgba(255,255,255,.03));
+}
+.ach-item .ai-icon { font-size: 21px; line-height: 1.2; flex-shrink: 0; }
+.ach-item .ai-body { flex: 1; min-width: 0; }
+.ach-item .ai-name { font-size: 13px; font-weight: 700; color: #e8f4ff; }
+.ach-item.done .ai-name { color: var(--gold); }
+.ach-item .ai-desc { font-size: 10.5px; color: #8fb2cc; margin-top: 1px; }
+.ach-item .ai-prog {
+  margin-top: 5px; height: 4px; border-radius: 2px;
+  background: rgba(255,255,255,.1); overflow: hidden;
+}
+.ach-item .ai-prog i {
+  display: block; height: 100%; width: 0;
+  background: var(--neon); border-radius: 2px;
+  transition: width .5s ease;
+}
+.ach-item.done .ai-prog i { background: var(--gold); }
+.ach-item .ai-num { font-size: 10px; color: #7fa8c9; margin-top: 2px; }
+
+/* ---------- 面板标题栏里的副标题 ---------- */
+#statsWho { color: #8fb2cc; }
+
+/* ---------- 移动端适配 ---------- */
+@media (max-width: 640px) {
+  .stats-card { width: 96vw; }
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+  .ach-list { grid-template-columns: 1fr; }
+  .ach-toast { right: 12px; left: 12px; bottom: 12px; min-width: 0; }
+  .wp-row .wbar { flex-basis: 70px; }
+}
+
+/* ---------- 尊重系统的「减少动态效果」设置 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  /* 尊重系统的「减少动态效果」设置：
+     - 关掉循环/呼吸类动画（持续干扰），换成静态高亮
+     - 保留一次性入场过渡，但时长压短、去掉位移，只留淡入
+     - 所有进度条过渡改为瞬时，避免"慢慢爬" */
+  .btn.primary {
+    animation: none !important;
+    box-shadow: 0 0 16px rgba(53,224,255,.28);
+  }
+  .card-in { animation: cardInRM .18s ease both !important; }
+  .overlay.panel:not(.panel-anim) .stagger { animation: fadeUpRM .18s ease calc(var(--i, 0) * 20ms) both !important; }
+  .ach-toast.show { animation: achInRM 4.2s linear forwards !important; }
+  .wp-row .wbar i, .ach-item .ai-prog i, #achProgressFill { transition: none !important; }
+  .overlay.panel, .overlay.panel .panel-card { transition-duration: .12s !important; }
+  .overlay.panel .panel-close { transition: none !important; }
+}
+/* reduced-motion 专用：只淡入，不位移 */
+@keyframes fadeUpRM { from { opacity: 0; } to { opacity: 1; } }
+@keyframes cardInRM { from { opacity: 0; } to { opacity: 1; } }
+@keyframes achInRM {
+  0% { opacity: 0; } 6% { opacity: 1; } 88% { opacity: 1; } 100% { opacity: 0; }
+}
+
+/* 战绩面板空状态（未登录 / 加载中） */
+.stat-empty {
+  grid-column: 1 / -1;
+  padding: 26px 14px;
+  text-align: center;
+  color: #8fb2cc;
+  font-size: 13px;
+  background: rgba(255,255,255,.03);
+  border: 1px dashed rgba(255,255,255,.14);
+  border-radius: 10px;
+  animation: fadeUp .3s ease both;
+}

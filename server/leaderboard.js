@@ -56,6 +56,31 @@ function blankProfile(name, ip) {
     nodelocId: null,
     kills: 0, deaths: 0, bossKills: 0, bestStreak: 0, coins: null,
     owned: [], eq: {}, joins: 0, last: 0, decoyKills: 0, loginDay: 1, lastClaimDate: '',
+    // ---- 战绩统计（服务端累加，不做展示以外的用途）----
+    st: blankStats(),
+    // ---- 已解锁成就 id ----
+    ach: [],
+  };
+}
+
+/** 新增统计字段，全部为累加计数器（0 起始） */
+function blankStats() {
+  return {
+    dmgDealt: 0,      // 总伤害
+    dmgTaken: 0,      // 总承受伤害
+    shotsFired: 0,    // 开枪次数
+    shotsHit: 0,      // 命中次数（至少命中一个目标）
+    headshots: 0,     // 爆头次数
+    crits: 0,         // 暴击次数
+    meleeKills: 0,    // 近战击杀
+    gunKills: 0,      // 枪械击杀
+    nadeKills: 0,     // 投掷物击杀
+    longestKill: 0,   // 最远击杀距离
+    streakMax: 0,     // 单条命最高连杀
+    playMs: 0,        // 总游戏时长
+    deathsByBoss: 0,  // 被 BOSS 击杀次数
+    witherKills: 0,   // 击杀处于连杀中的玩家（终结连杀）
+    wpKills: {},      // 各武器击杀数 { weaponId: n }
   };
 }
 
@@ -69,6 +94,15 @@ function normalize(prof) {
   if (prof.lastClaimDate === undefined) prof.lastClaimDate = '';
   if (!Array.isArray(prof.owned)) prof.owned = [];
   if (!prof.eq || typeof prof.eq !== 'object') prof.eq = {};
+  // 老档案补统计字段：缺啥补啥，不动已有值
+  const base = blankStats();
+  if (!prof.st || typeof prof.st !== 'object') prof.st = base;
+  else {
+    for (const k of Object.keys(base)) {
+      if (prof.st[k] === undefined) prof.st[k] = base[k];
+    }
+  }
+  if (!Array.isArray(prof.ach)) prof.ach = [];
   return prof;
 }
 

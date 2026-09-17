@@ -9,6 +9,7 @@ const { WebSocketServer } = require('ws');
 const World = require('./world');
 const board = require('./leaderboard');
 const cfg = require('./config');
+const stats = require('./stats');
 const { AntiCheat, fpsPreset, createJsonStore, TokenBucket, RATE_PRESETS } = require('./anticheat');
 const { normalizeIp } = require('./iputil');
 const zard = require('./decoy/zard');
@@ -311,6 +312,17 @@ wss.on('connection', (ws, req) => {
       case 'chat':   if (p) world.handleChat(p, m, ws.ip); break;
       case 'buy':    if (p) world.handleBuy(p, m); break;
       case 'equip':  if (p) world.handleEquipCos(p, m); break;
+      case 'stats': {
+        const p = world.players.get(ws.playerId);
+        if (!p) { rawSend(ws, JSON.stringify({ type: 'stats', ok: false, text: '未进入游戏' })); break; }
+        const prof = board.getForPlayer(p);
+        rawSend(ws, JSON.stringify({
+          type: 'stats', ok: true,
+          summary: stats.summary(prof),
+          achievements: stats.achievementList(prof),
+        }));
+        break;
+      }
       case 'profile': {
         const res = login.profilePayload(ws.ip, m.name, m.password, ws.oauth);
         rawSend(ws, JSON.stringify({ type: 'profile', ...res }));

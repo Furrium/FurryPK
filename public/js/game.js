@@ -260,6 +260,267 @@
   }
   function send(obj) { if (wsOk && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
 
+  // ==================== UI 动效基础设施 ====================
+  // 面板用 .panel-anim 代替 .hidden：前者用 visibility+opacity 做过渡，
+  // 后者是 display:none 无法过渡。两者互斥使用。
+
+  /** 打开/关闭带动画的面板 */
+  // 面板状态判定：hidden（首屏关闭）或 panel-anim（动画关闭中）任一存在即视为关闭
+  function panelIsOpen(el) {
+    if (!el) return false;
+    return !el.classList.contains('hidden') && !el.classList.contains('panel-anim');
+  }
+
+  function panelToggle(el, open) {
+    if (!el) return false;
+    const isOpen = panelIsOpen(el);
+    const want = open === undefined ? !isOpen : !!open;
+    if (want === isOpen) return want;          // 状态已一致，不重复操作
+    if (want) {
+      // 打开：清掉两种关闭态标记
+      clearTimeout(el._hideTimer);
+      el.classList.remove('hidden');
+      el.classList.remove('panel-anim');
+      applyStagger(el);
+    } else {
+      // 关闭：先加 panel-anim 触发过渡；过渡结束后再补 hidden，
+      // 这样 JS 未执行时首屏仍是 hidden（不闪现），过渡也能正常播完。
+      el.classList.add('panel-anim');
+      clearTimeout(el._hideTimer);
+      el._hideTimer = setTimeout(() => {
+        if (el.classList.contains('panel-anim')) el.classList.add('hidden');
+      }, 220);
+    }
+    return want;
+  }
+
+  /** 给面板内的 .stagger 元素按顺序编号，实现依次弹入 */
+  function applyStagger(el) {
+    const items = el.querySelectorAll('.stagger');
+    items.forEach((n, i) => n.style.setProperty('--i', i));
+    // 重新触发动画
+    el.querySelectorAll('.stagger').forEach(n => {
+      n.style.animation = 'none';
+      void n.offsetWidth;
+      n.style.animation = '';
+    });
+  }
+
+  /** 数字滚动：把元素的文本从当前值平滑过渡到目标值 */
+  function countTo(el, to, opts) {
+    if (!el) return;
+    const dur = (opts && opts.dur) || 520;
+    const from = Number(el.dataset.v || 0);
+    const target = Number(to) || 0;
+    if (from === target) { el.textContent = fmtNum(target); return; }
+    if (el._raf) cancelAnimationFrame(el._raf);
+    const t0 = performance.now();
+    const step = (t) => {
+      const k = Math.min(1, (t - t0) / dur);
+      const e = 1 - Math.pow(1 - k, 3);           // easeOutCubic
+      const v = Math.round(from + (target - from) * e);
+      el.textContent = fmtNum(v);
+      el.dataset.v = v;
+      if (k < 1) el._raf = requestAnimationFrame(step);
+      else { el.dataset.v = target; el.textContent = fmtNum(target); el._raf = null; }
+    };
+    el._raf = requestAnimationFrame(step);
+    if (opts && opts.bump) {
+      el.classList.remove('coin-bump');
+      void el.offsetWidth;
+      el.classList.add('coin-bump');
+    }
+  }
+  function fmtNum(n) {
+    return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  }
+
+  /** 按钮点击涟漪位置 */
+  function attachRipple(root) {
+    (root || document).querySelectorAll('.btn').forEach(b => {
+      if (b._ripple) return;
+      b._ripple = true;
+      b.addEventListener('pointerdown', (e) => {
+        const r = b.getBoundingClientRect();
+        b.style.setProperty('--rx', ((e.clientX - r.left) / r.width * 100) + '%');
+        b.style.setProperty('--ry', ((e.clientY - r.top) / r.height * 100) + '%');
+        b.classList.add('tapped');
+        setTimeout(() => b.classList.remove('tapped'), 200);
+      });
+    });
+  }
+
+  /** 成就解锁弹窗 */
+  let achToastTimer = null;
+  const achQueue = [];
+  function achToast(a) {
+    achQueue.push(a);
+    if (!achToastTimer) drainAchQueue();
+  }
+  function drainAchQueue() {
+    const a = achQueue.shift();
+    if (!a) { achToastTimer = null; return; }
+    const box = $('achToast');
+    if (!box) { achToastTimer = null; return; }
+    $('achToastIcon').textContent = a.icon || '🏆';
+    $('achToastName').textContent = a.name || '成就';
+    $('achToastReward').textContent = a.reward > 0 ? '+' + a.reward + ' 金币  ·  ' + (a.desc || '') : (a.desc || '');
+    box.classList.remove('hidden', 'show');
+    void box.offsetWidth;
+    box.classList.add('show');
+    G.audio.buy && G.audio.buy();
+    achToastTimer = setTimeout(() => {
+      box.classList.remove('show');
+      setTimeout(() => { drainAchQueue(); }, 200);
+    }, 4200);
+  }
+
+  // ==================== 战绩 & 成就面板 ====================
+  let statsData = null;      // 最近一次拿到的战绩数据
+  let statsTab = 'stats';    // 'stats' | 'ach'
+
+  function requestStats() {
+    send({ type: 'stats' });
+  }
+
+  function renderStats(m) {
+    // 未登录 / 未进游戏时给明确提示，避免面板一片空白
+    if (!m || !m.ok) {
+      const reason = (m && m.text) ? m.text : '请先用 NodeLoc 登录并进入游戏';
+      const grid = $('statGrid');
+      if (grid) {
+        grid.innerHTML = `<div class="stat-empty">📊 ${reason}</div>`;
+      }
+      const wp = $('statWeapons');
+      if (wp) wp.innerHTML = '';
+      const list = $('achList');
+      if (list) list.innerHTML = `<div class="stat-empty">成就数据需要登录后查看</div>`;
+      const cnt = $('achCount');
+      if (cnt) cnt.textContent = '—';
+      return;
+    }
+    statsData = m;
+    const s = m.summary || {};
+    const who = $('statsWho');
+    if (who) who.textContent = myName ? '· ' + myName : '';
+
+    // --- 数字格子 ---
+    const cells = [
+      { v: s.kills | 0,               l: '总击杀',   cls: '' },
+      { v: s.deaths | 0,              l: '总死亡',   cls: '' },
+      { v: s.kd,                      l: 'K/D',      cls: 'gold' },
+      { v: s.bossKills | 0,           l: 'BOSS 击杀', cls: 'pink' },
+      { v: (s.bestStreak | 0),        l: '最高连杀', cls: 'gold' },
+      { v: s.headshots | 0,           l: '爆头数',   cls: '' },
+      { v: fmtNum(s.dmgDealt | 0),    l: '总伤害',   cls: '' },
+      { v: (s.accuracy || 0) + '%',   l: '命中率',   cls: '' },
+      { v: (s.longestKill | 0) + 'm', l: '最远击杀', cls: '' },
+      { v: s.gunKills | 0,            l: '枪械击杀', cls: '' },
+      { v: s.meleeKills | 0,          l: '近战击杀', cls: '' },
+      { v: s.nadeKills | 0,           l: '爆破击杀', cls: '' },
+      { v: s.crits | 0,               l: '暴击次数', cls: 'pink' },
+      { v: s.witherKills | 0,         l: '终结连杀', cls: '' },
+      { v: fmtDur(s.playMs | 0),      l: '游戏时长', cls: 'gold' },
+    ];
+    const grid = $('statGrid');
+    if (grid) {
+      grid.innerHTML = cells.map((c, i) =>
+        `<div class="stat-cell ${c.cls} stagger" style="--i:${i}"><div class="sv">${c.v}</div><div class="sl">${c.l}</div></div>`
+      ).join('');
+    }
+
+    // --- 武器击杀条 ---
+    const wk = s.wpKills || {};
+    const rows = Object.keys(wk)
+      .map(k => ({ k, n: wk[k] | 0, name: (G.defs && G.defs.weapons && G.defs.weapons[k] && G.defs.weapons[k].name) || k }))
+      .filter(r => r.n > 0)
+      .sort((a, b) => b.n - a.n);
+    const maxN = rows.length ? rows[0].n : 1;
+    const wpBox = $('statWeapons');
+    if (wpBox) {
+      wpBox.innerHTML = rows.length
+        ? rows.map((r, i) =>
+            `<div class="wp-row stagger" style="--i:${i}">
+               <span class="wn">${r.name}</span>
+               <span class="wbar"><i data-w="${Math.round(r.n / maxN * 100)}"></i></span>
+               <span class="wc">${r.n}</span>
+             </div>`).join('')
+        : '<div class="wp-row"><span class="wn" style="opacity:.6">还没有武器击杀记录</span></div>';
+      // 下一帧再设置宽度，触发过渡动画
+      requestAnimationFrame(() => {
+        wpBox.querySelectorAll('.wbar i').forEach(el => { el.style.width = (el.dataset.w || 0) + '%'; });
+      });
+    }
+
+    // --- 成就列表 ---
+    renderAchList(m.achievements || []);
+    switchStatsTab(statsTab);
+  }
+
+  function renderAchList(list) {
+    const box = $('achList');
+    if (!box) return;
+    const done = list.filter(a => a.done).length;
+    const cnt = $('achCount');
+    if (cnt) cnt.textContent = done + ' / ' + list.length;
+    requestAnimationFrame(() => {
+      const fill = $('achProgressFill');
+      if (fill) fill.style.width = (list.length ? Math.round(done / list.length * 100) : 0) + '%';
+    });
+
+    box.innerHTML = list.map((a, i) => {
+      const pct = a.goal > 0 ? Math.min(100, Math.round((a.progress || 0) / a.goal * 100)) : 0;
+      return `<div class="ach-item ${a.done ? 'done' : ''} stagger" style="--i:${i}">
+        <div class="ai-icon">${a.done ? a.icon : '🔒'}</div>
+        <div class="ai-body">
+          <div class="ai-name">${a.name}</div>
+          <div class="ai-desc">${a.desc}</div>
+          <div class="ai-prog"><i data-w="${pct}"></i></div>
+          <div class="ai-num">${a.done ? '已达成' : fmtNum(a.progress || 0) + ' / ' + fmtNum(a.goal)}${a.reward > 0 ? ' · +' + a.reward + '金币' : ''}</div>
+        </div>
+      </div>`;
+    }).join('');
+    requestAnimationFrame(() => {
+      box.querySelectorAll('.ai-prog i').forEach(el => { el.style.width = (el.dataset.w || 0) + '%'; });
+    });
+  }
+
+  function switchStatsTab(tab) {
+    statsTab = tab === 'ach' ? 'ach' : 'stats';
+    const sv = $('statsView'), av = $('achView');
+    if (sv) sv.classList.toggle('hidden', statsTab !== 'stats');
+    if (av) av.classList.toggle('hidden', statsTab !== 'ach');
+    const t1 = $('tabStats'), t2 = $('tabAch');
+    if (t1) t1.classList.toggle('active', statsTab === 'stats');
+    if (t2) t2.classList.toggle('active', statsTab === 'ach');
+    // 切换时重播弹入
+    const host = statsTab === 'stats' ? sv : av;
+    if (host) applyStagger(host);
+  }
+
+  function fmtDur(ms) {
+    if (!ms) return '0m';
+    const m = Math.floor(ms / 60000);
+    if (m < 60) return m + 'm';
+    const h = Math.floor(m / 60);
+    const rm = m % 60;
+    return rm ? h + 'h' + rm + 'm' : h + 'h';
+  }
+
+  function toggleStats(open) {
+    const el = $('statsPanel');
+    const want = panelToggle(el, open);
+    if (want) {
+      // 先清空成「加载中」，避免显示上一次的旧数据或空白
+      const grid = $('statGrid');
+      if (grid && !grid.querySelector('.stat-cell')) {
+        grid.innerHTML = '<div class="stat-empty">加载中…</div>';
+      }
+      requestStats();
+    }
+  }
+
+
   function handleMsg(m) {
     switch (m.type) {
       case 'defs': onDefs(m); break;
@@ -273,7 +534,23 @@
         break;
       case 'spec': mode = 'spec'; enterSpec(); break;
       case 'left': backToMenu(); break;
-      case 'you': you = { coins: m.coins, owned: m.owned, eq: m.eq }; renderShop(); updateMenuProfile(); renderWardrobe(); break;
+      case 'you': {
+        const prevCoins = you && you.coins;
+        you = { coins: m.coins, owned: m.owned, eq: m.eq };
+        renderShop(); updateMenuProfile(); renderWardrobe();
+        // 金币变化时滚动数字
+        if (prevCoins != null && m.coins !== prevCoins) {
+          const el = $('coinNum') || $('menuCoins');
+          if (el) countTo(el, m.coins, { bump: true });
+        }
+        break;
+      }
+      case 'stats':
+        renderStats(m);
+        break;
+      case 'ach':
+        achToast(m);
+        break;
       case 'oauth':
         applyOauthState(m);
         break;
@@ -1769,13 +2046,13 @@
     $('hud').classList.add('hidden');
     $('specBar').classList.add('hidden');
     $('death').classList.add('hidden');
-    $('shop').classList.add('hidden');
+    panelToggle($('shop'), false);
     $('pause').classList.add('hidden');
-    $('about').classList.add('hidden');
-    $('loginPanel').classList.add('hidden');
-    $('wardrobe').classList.add('hidden');
-    if ($('passPanel')) $('passPanel').classList.add('hidden');
-    if ($('unlockPanel')) $('unlockPanel').classList.add('hidden');
+    panelToggle($('about'), false);
+    panelToggle($('loginPanel'), false);
+    panelToggle($('wardrobe'), false);
+    if ($('passPanel')) panelToggle($('passPanel'), false);
+    if ($('unlockPanel')) panelToggle($('unlockPanel'), false);
     updateTouchLayout();
     resetGyroBase();
     syncGyroListener();
@@ -1974,7 +2251,7 @@
     shopPre = { r, sc, cam, model };
   }
   function renderShopPre(dt) {
-    if (!shopPre || $('shop').classList.contains('hidden')) return;
+    if (!shopPre || !panelIsOpen($('shop'))) return;
     const eq = hoverEq || you.eq || {};
     const fxPreview = ['knife', 'sword', 'pistol', 'shotgun', 'mg', 'sniper', 'charge', 'railgun', 'hammer'];
     const previewWeapon = hoverWeapon || (shopTab === 'fx' ? fxPreview[Math.floor(perfNow / 1400) % fxPreview.length]
@@ -2188,7 +2465,7 @@
   }
   function gyroAllowed() {
     return settings.gyro && GYRO_SUPPORTED && mode !== 'menu' && canDriveCam()
-      && $('shop').classList.contains('hidden') && $('pause').classList.contains('hidden')
+      && !panelIsOpen($('shop')) && !panelIsOpen($('pause'))
       && $('lost').classList.contains('hidden');
   }
   function applyGyro(dYawDeg, dPitchDeg) {
@@ -2340,14 +2617,14 @@
   }
   document.addEventListener('pointerlockchange', () => {
     if (!document.pointerLockElement && lockWanted && (mode === 'play' || mode === 'spec')
-      && $('shop').classList.contains('hidden') && $('pause').classList.contains('hidden') && !NOLOCK && !TOUCH) {
+      && !panelIsOpen($('shop')) && !panelIsOpen($('pause')) && !NOLOCK && !TOUCH) {
       openPause();
     }
   });
   canvas.addEventListener('click', () => {
     G.audio.init();
     if (!TOUCH && mode !== 'menu' && !document.pointerLockElement
-      && $('pause').classList.contains('hidden') && $('shop').classList.contains('hidden')) requestLock();
+      && !panelIsOpen($('pause')) && !panelIsOpen($('shop'))) requestLock();
   });
   $('btnResume').onclick = () => closePause();
   $('btnToMenu').onclick = () => { send({ type: 'leave' }); rejoinWanted = false; lockWanted = false; backToMenu(); };
@@ -2373,7 +2650,7 @@
   });
   document.addEventListener('mousedown', e => {
     if (mode === 'menu' || isTyping()) return;
-    if (!$('shop').classList.contains('hidden') || !$('pause').classList.contains('hidden')
+    if (panelIsOpen($('shop')) || panelIsOpen($('pause'))
       || !$('lost').classList.contains('hidden')) return;
     if (e.button === 0) {
       mouseDown = true;
@@ -2398,8 +2675,8 @@
   // ---------- 触屏：虚拟摇杆 + 视角拖拽（document 级监听，避免触控层挡住 canvas 收不到触摸） ----------
   function touchDriveAllowed() {
     if (touchEditMode) return false;
-    return canDriveCam() && !isTyping() && $('shop').classList.contains('hidden')
-      && $('pause').classList.contains('hidden') && $('lost').classList.contains('hidden');
+    return canDriveCam() && !isTyping() && !panelIsOpen($('shop'))
+      && !panelIsOpen($('pause')) && $('lost').classList.contains('hidden');
   }
   function touchHitsUi(x, y) {
     const el = document.elementFromPoint(x, y);
@@ -2473,8 +2750,8 @@
   // 触屏按钮：Fire/Jump 需要"按住"语义走 touchstart/touchend；武器栏同理用 touchstart（多指按住摇杆/跳跃时 click 往往不触发）
   function touchActionAllowed() {
     if (touchEditMode) return false;
-    return mode !== 'menu' && !isTyping() && $('shop').classList.contains('hidden')
-      && $('pause').classList.contains('hidden') && $('lost').classList.contains('hidden');
+    return mode !== 'menu' && !isTyping() && !panelIsOpen($('shop'))
+      && !panelIsOpen($('pause')) && $('lost').classList.contains('hidden');
   }
   function bindMobileTap(el, handler) {
     if (TOUCH) {
@@ -2531,14 +2808,23 @@
   $('specViewBtn').onclick = () => { specView = specView === 'tp' ? 'fp' : 'tp'; updateSpecBar(); };
   $('specJoinBtn').onclick = () => joinFromSpec();
   $('tMenu').onclick = () => { if (mode === 'play' || mode === 'spec') openPause(); };
-  $('tBoard').onclick = () => { $('board').classList.toggle('hidden'); };
+  $('tBoard').onclick = () => { panelToggle($('board')); };
+
+  // ---- 战绩 & 成就面板 ----
+  if ($('btnStats')) $('btnStats').onclick = () => { G.audio.ui && G.audio.ui(); toggleStats(true); };
+  if ($('statsClose')) $('statsClose').onclick = () => toggleStats(false);
+  if ($('tabStats')) $('tabStats').onclick = () => { G.audio.ui && G.audio.ui(); switchStatsTab('stats'); };
+  if ($('tabAch')) $('tabAch').onclick = () => { G.audio.ui && G.audio.ui(); switchStatsTab('ach'); };
+
+  // ---- 面板内元素依次弹入 + 按钮涟漪：初始化时挂一次 ----
+  attachRipple(document);
+  // 商店和成就卡片加 card-in 类（渲染时由 renderShop / renderAchList 生成）
+
   $('tChat').onclick = () => { if (mode === 'play') openChat(); };
-  $('boardClose').onclick = () => { $('board').classList.add('hidden'); };
+  $('boardClose').onclick = () => { panelToggle($('board'), false); };
   $('shopClose').onclick = () => toggleShop(false);
   function toggleAbout(open) {
-    const el = $('about');
-    const want = open === undefined ? el.classList.contains('hidden') : open;
-    el.classList.toggle('hidden', !want);
+    panelToggle($('about'), open);
   }
   const ARSENAL_WPS = ['knife', 'sword', 'hammer', 'pistol', 'shotgun', 'mg', 'sniper', 'charge', 'railgun', 'nade', 'flash', 'smoke'];
   const ARSENAL_FALLBACK_NAME = {
@@ -2697,7 +2983,7 @@
 
   // 滚轮：战局中切武器 / 观战自由视角调速
   addEventListener('wheel', e => {
-    if (isTyping() || !$('shop').classList.contains('hidden')) return;
+    if (isTyping() || panelIsOpen($('shop'))) return;
     if (mode === 'play' && mySnap && mySnap.al) {
       cycleWeapon(e.deltaY > 0 ? 1 : -1);
     } else if (mode === 'spec' && !isFollowing()) {
@@ -2723,14 +3009,15 @@
   }
 
   document.addEventListener('keydown', e => {
-    if (e.code === 'Tab') { e.preventDefault(); if (mode !== 'menu' && !isTyping()) $('board').classList.remove('hidden'); return; }
+    if (e.code === 'Tab') { e.preventDefault(); if (mode !== 'menu' && !isTyping()) panelToggle($('board'), true); return; }
     if (e.code === 'Escape') {
-      if (!$('arsenal').classList.contains('hidden')) { toggleArsenal(false); return; }
-      if (!$('about').classList.contains('hidden')) { toggleAbout(false); return; }
-      if (!$('loginPanel').classList.contains('hidden')) { toggleLoginPanel(false); return; }
-      if (!$('wardrobe').classList.contains('hidden')) { toggleWardrobe(false); return; }
-      if (!$('shop').classList.contains('hidden')) { toggleShop(false); return; }
-      if (!$('pause').classList.contains('hidden')) { closePause(); return; }
+      if (panelIsOpen($('arsenal'))) { toggleArsenal(false); return; }
+      if (panelIsOpen($('about'))) { toggleAbout(false); return; }
+      if (panelIsOpen($('loginPanel'))) { toggleLoginPanel(false); return; }
+      if (panelIsOpen($('wardrobe'))) { toggleWardrobe(false); return; }
+      if (panelIsOpen($('statsPanel'))) { toggleStats(false); return; }
+      if (panelIsOpen($('shop'))) { toggleShop(false); return; }
+      if (panelIsOpen($('pause'))) { closePause(); return; }
       if (mode === 'play' || mode === 'spec') openPause();
       return;
     }
@@ -2757,7 +3044,7 @@
     }
   });
   document.addEventListener('keyup', e => {
-    if (e.code === 'Tab') { e.preventDefault(); $('board').classList.add('hidden'); return; }
+    if (e.code === 'Tab') { e.preventDefault(); panelToggle($('board'), false); return; }
     keys[e.code] = false;
   });
 
@@ -2817,7 +3104,7 @@
   function tryInteract() {
     if (!defs) return;
     const md = nearestMerchantDist();
-    if (md < defs.rules.merchantDist || !$('shop').classList.contains('hidden')) toggleShop();
+    if (md < defs.rules.merchantDist || panelIsOpen($('shop'))) toggleShop();
   }
 
   // 聊天
@@ -3031,7 +3318,7 @@
 
   function combat(dt) {
     if (!mySnap || !mySnap.al || isTyping()) return;
-    if (!$('shop').classList.contains('hidden') || !$('pause').classList.contains('hidden')) return;
+    if (panelIsOpen($('shop')) || panelIsOpen($('pause'))) return;
     const t = now();
     const zomb = mySnap.bf.some(b => b[0] === 'zombie');
     const wantZoom = rmbDown && me.active === 'gun' && gunHasZoom(mySnap.gw);
@@ -3122,7 +3409,7 @@
   }
 
   function nadeInputBlocked() {
-    return isTyping() || !$('shop').classList.contains('hidden') || !$('pause').classList.contains('hidden')
+    return isTyping() || panelIsOpen($('shop')) || panelIsOpen($('pause'))
       || !$('lost').classList.contains('hidden');
   }
 
@@ -3199,7 +3486,7 @@
   // ---------- 本地移动 ----------
   function movement(dt) {
     if (!mySnap || !mySnap.al) { me.vx = me.vz = 0; return; }
-    if (!$('pause').classList.contains('hidden')) { me.moving = false; me.vx = me.vz = 0; return; }
+    if (panelIsOpen($('pause'))) { me.moving = false; me.vx = me.vz = 0; return; }
     const zomb = mySnap.bf.some(b => b[0] === 'zombie');
     const hasSpeed = mySnap.bf.some(b => b[0] === 'speed');
     const hasJump = mySnap.bf.some(b => b[0] === 'jump');
@@ -3288,7 +3575,7 @@
       }
     }
     const md = nearestMerchantDist();
-    $('interactHint').classList.toggle('hidden', !(md < defs.rules.merchantDist && $('shop').classList.contains('hidden')));
+    $('interactHint').classList.toggle('hidden', !(md < defs.rules.merchantDist && !panelIsOpen($('shop'))));
   }
 
   let moveSendT = 0;
@@ -3639,7 +3926,7 @@
     me.spread = Math.max(0, me.spread - 0.6);
     const sp = me.spread + (me.moving ? 4 : 0);
     $('crosshair').style.setProperty('--sp', sp + 'px');
-    $('crosshair').style.display = (mySnap.al && me.zoom < 0.5 && $('shop').classList.contains('hidden')) ? '' : 'none';
+    $('crosshair').style.display = (mySnap.al && me.zoom < 0.5 && !panelIsOpen($('shop'))) ? '' : 'none';
     $('scope').classList.toggle('hidden', me.zoom < 0.5);
     const rl = me.reloadUntil - now();
     const rb = $('reloadBar');
