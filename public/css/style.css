@@ -933,3 +933,17 @@ body.touch-edit #joyHint::after { bottom: -20px; }
   border-radius: 10px;
   animation: fadeUp .3s ease both;
 }
+
+/* 关于面板：原作致谢行 */
+.about-origin {
+  margin: 12px 0 2px;
+  padding: 8px 12px;
+  text-align: center;
+  font-size: 12px;
+  color: #8fb2cc;
+  background: rgba(255, 255, 255, .04);
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 8px;
+}
+.about-origin a { color: var(--neon); text-decoration: none; font-weight: 700; }
+.about-origin a:hover { text-decoration: underline; }
