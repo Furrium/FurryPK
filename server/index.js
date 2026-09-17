@@ -1,4 +1,4 @@
-// 零区冲突 — 服务端入口：一个 URL 同时提供静态客户端与 WebSocket 联机（单房间）
+// FurSonic — 服务端入口：一个 URL 同时提供静态客户端与 WebSocket 联机（单房间）
 // 反作弊：AC_MODE=off 可关闭惩罚（冷却/数值等功能校验仍生效），详见 server/anticheat/README.md
 'use strict';
 const http = require('http');
@@ -474,7 +474,7 @@ setInterval(() => {
 }, 2000);
 
 server.listen(PORT, () => {
-  console.log(`[零区冲突] 服务已启动: http://0.0.0.0:${PORT}  (单房间, 最多 ${cfg.RULES.maxPlayers} 人, 反作弊${ac.status().enabled ? '开启' : '关闭'})`);
+  console.log(`[FurSonic] 服务已启动: http://0.0.0.0:${PORT}  (单房间, 最多 ${cfg.RULES.maxPlayers} 人, 反作弊${ac.status().enabled ? '开启' : '关闭'})`);
   if (oauthNl.enabled()) {
     console.log(`[oauth] NodeLoc 已启用 → 回调 ${oauthNl.REDIRECT_URI}`);
   } else {

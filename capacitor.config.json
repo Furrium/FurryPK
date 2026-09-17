@@ -1,6 +1,6 @@
 {
   "appId": "com.zard.neonarena",
-  "appName": "零区冲突",
+  "appName": "FurSonic",
   "webDir": "public",
   "android": {
     "allowMixedContent": true,
