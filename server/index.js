@@ -313,11 +313,29 @@ wss.on('connection', (ws, req) => {
       case 'buy':    if (p) world.handleBuy(p, m); break;
       case 'equip':  if (p) world.handleEquipCos(p, m); break;
       case 'stats': {
-        const p = world.players.get(ws.playerId);
-        if (!p) { rawSend(ws, JSON.stringify({ type: 'stats', ok: false, text: '未进入游戏' })); break; }
-        const prof = board.getForPlayer(p);
+        // 战绩面板从主菜单就能打开，此时玩家尚未 join，ws.playerId 为 0。
+        // 因此不能依赖「在游戏中」——按 NodeLoc ID → 当前玩家 → IP 依次回退查档案。
+        let prof = null;
+        if (ws.oauth && ws.oauth.id != null) {
+          prof = board.peekByNodeLoc(ws.oauth.id) || board.getByNodeLoc(ws.oauth.id);
+        }
+        if (!prof) {
+          const p = ws.playerId ? world.players.get(ws.playerId) : null;
+          if (p) prof = board.getForPlayer(p);
+        }
+        if (!prof) prof = board.peekByIp(ws.ip) || null;
+
+        if (!prof) {
+          rawSend(ws, JSON.stringify({
+            type: 'stats', ok: false,
+            text: ws.oauth ? '还没有战绩记录，先进游戏打一局吧' : '登录后可查看战绩',
+            needOauth: !ws.oauth,
+          }));
+          break;
+        }
         rawSend(ws, JSON.stringify({
           type: 'stats', ok: true,
+          name: prof.name || '',
           summary: stats.summary(prof),
           achievements: stats.achievementList(prof),
         }));

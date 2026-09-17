@@ -40,7 +40,18 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #05070d;
 .menu-card { width: 340px; flex: 1 1 0; min-width: 0; max-width: none; padding: 20px 22px; text-align: center;
   background: var(--bg); border: 1px solid var(--line); border-radius: 14px;
   box-shadow: 0 0 60px rgba(53,224,255,.12), inset 0 0 30px rgba(53,224,255,.04);
-  max-height: min(92vh, 680px); overflow: hidden; display: flex; flex-direction: column; }
+  max-height: min(92vh, 680px);
+  /* 按钮变多后内容会超出：改为纵向滚动，避免操作说明被裁掉 */
+  overflow-y: auto; overflow-x: hidden;
+  display: flex; flex-direction: column;
+  overscroll-behavior: contain;
+  scrollbar-width: thin; scrollbar-color: rgba(53,224,255,.35) transparent; }
+.menu-card::-webkit-scrollbar { width: 6px; }
+.menu-card::-webkit-scrollbar-track { background: transparent; }
+.menu-card::-webkit-scrollbar-thumb {
+  background: rgba(53,224,255,.3); border-radius: 3px;
+}
+.menu-card::-webkit-scrollbar-thumb:hover { background: rgba(53,224,255,.5); }
 .menu-logo {
   width: 64px; height: 64px; margin: 0 auto 6px; display: block; flex-shrink: 0;
   border-radius: 14px; object-fit: cover;
@@ -102,7 +113,8 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #05070d;
 .btn.ghost { background: transparent; border-color: rgba(255,255,255,.14); font-size: 13px; padding: 7px; margin-bottom: 4px; }
 .btn.ghost:hover { background: rgba(255,255,255,.06); box-shadow: none; }
 .help { margin-top: 8px; padding: 8px 10px; text-align: left; background: rgba(255,255,255,.03); border-radius: 8px;
-  flex: 1; min-height: 0; overflow: hidden; }
+  /* 不再用 flex:1 抢剩余空间：让内容决定高度，超出的部分由 .menu-card 滚动 */
+  flex: 0 0 auto; }
 .help-title { font-size: 11px; color: var(--neon); margin-bottom: 4px; letter-spacing: 2px; }
 .help-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 8px; font-size: 11px; color: #a8c4dc; }
 .menu-tip { margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,.06); font-size: 10px; color: #f0b86c; line-height: 1.4; }
