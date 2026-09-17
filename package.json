@@ -1,7 +1,7 @@
 {
-  "name": "neon-arena-fps",
+  "name": "fursonic",
   "version": "1.0.0",
-  "description": "3D 第一人称多人在线竞技射击游戏 — 单房间权威 Node 服务器 + Three.js 客户端",
+  "description": "FurSonic — 浏览器多人 FPS，three.js r128 + WebSocket 权威服务端",
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",

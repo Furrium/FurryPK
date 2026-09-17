@@ -1,4 +1,4 @@
-# FurSonic · FurryPK SUPER Edition
+# FurSonic
 
 浏览器多人 FPS。three.js r128 + WebSocket 权威服务端,无构建步骤、无 npm 依赖,`docker compose up` 即可跑。
 
@@ -7,8 +7,8 @@
 ## 快速开始
 
 ```bash
-git clone <你的仓库地址> fps-online-game
-cd fps-online-game
+git clone https://github.com/Furrium/FurSonic.git
+cd FurSonic
 
 cp .env.example .env
 # 编辑 .env —— 至少改 PORT 和 NodeLoc_REDIRECT_URI
